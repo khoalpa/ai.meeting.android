@@ -1,0 +1,76 @@
+name: Android Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Check signing secrets
+        run: |
+          test -n "${AI_MEETING_UPLOAD_KEYSTORE_BASE64:-}"
+          test -n "${AI_MEETING_UPLOAD_STORE_PASSWORD:-}"
+          test -n "${AI_MEETING_UPLOAD_KEY_ALIAS:-}"
+          test -n "${AI_MEETING_UPLOAD_KEY_PASSWORD:-}"
+        env:
+          AI_MEETING_UPLOAD_KEYSTORE_BASE64: ${{ secrets.AI_MEETING_UPLOAD_KEYSTORE_BASE64 }}
+          AI_MEETING_UPLOAD_STORE_PASSWORD: ${{ secrets.AI_MEETING_UPLOAD_STORE_PASSWORD }}
+          AI_MEETING_UPLOAD_KEY_ALIAS: ${{ secrets.AI_MEETING_UPLOAD_KEY_ALIAS }}
+          AI_MEETING_UPLOAD_KEY_PASSWORD: ${{ secrets.AI_MEETING_UPLOAD_KEY_PASSWORD }}
+
+      - name: Restore upload keystore
+        run: |
+          mkdir -p "$RUNNER_TEMP/keystore"
+          echo "$AI_MEETING_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/keystore/upload.jks"
+          echo "AI_MEETING_UPLOAD_STORE_FILE=$RUNNER_TEMP/keystore/upload.jks" >> "$GITHUB_ENV"
+        env:
+          AI_MEETING_UPLOAD_KEYSTORE_BASE64: ${{ secrets.AI_MEETING_UPLOAD_KEYSTORE_BASE64 }}
+
+      - name: Build signed release bundle
+        env:
+          AI_MEETING_UPLOAD_STORE_PASSWORD: ${{ secrets.AI_MEETING_UPLOAD_STORE_PASSWORD }}
+          AI_MEETING_UPLOAD_KEY_ALIAS: ${{ secrets.AI_MEETING_UPLOAD_KEY_ALIAS }}
+          AI_MEETING_UPLOAD_KEY_PASSWORD: ${{ secrets.AI_MEETING_UPLOAD_KEY_PASSWORD }}
+        run: |
+          chmod +x ./gradlew
+          VERSION_NAME="${GITHUB_REF_NAME#v}"
+          VERSION_CODE="${GITHUB_RUN_NUMBER}"
+          ./gradlew testDebugUnitTest lintDebug bundleRelease \
+            -PAI_MEETING_VERSION_NAME="$VERSION_NAME" \
+            -PAI_MEETING_VERSION_CODE="$VERSION_CODE"
+
+      - name: Verify bundle signature
+        run: |
+          VERIFY_OUTPUT="$(jarsigner -verify -verbose -certs app/build/outputs/bundle/release/app-release.aab 2>&1)"
+          echo "$VERIFY_OUTPUT"
+          echo "$VERIFY_OUTPUT" | grep -qi "jar is unsigned" && exit 1
+          echo "$VERIFY_OUTPUT" | grep -qi "jar verified"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            app/build/outputs/bundle/release/app-release.aab \
+            app/build/outputs/native-debug-symbols/release/native-debug-symbols.zip \
+            --generate-notes

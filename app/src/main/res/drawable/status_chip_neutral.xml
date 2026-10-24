@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/meeting_success_bg" />
+    <stroke
+        android:width="1dp"
+        android:color="#A7E8D6" />
+    <corners android:radius="8dp" />
+</shape>

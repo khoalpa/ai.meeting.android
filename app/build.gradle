@@ -1,0 +1,127 @@
+plugins {
+    id "com.android.application"
+}
+
+def appVersionCode = (findProperty("AI_MEETING_VERSION_CODE") ?: "1") as Integer
+def appVersionName = findProperty("AI_MEETING_VERSION_NAME") ?: "1.0"
+def releaseStoreFile = findProperty("AI_MEETING_UPLOAD_STORE_FILE") ?: System.getenv("AI_MEETING_UPLOAD_STORE_FILE")
+def releaseStorePassword = findProperty("AI_MEETING_UPLOAD_STORE_PASSWORD") ?: System.getenv("AI_MEETING_UPLOAD_STORE_PASSWORD")
+def releaseKeyAlias = findProperty("AI_MEETING_UPLOAD_KEY_ALIAS") ?: System.getenv("AI_MEETING_UPLOAD_KEY_ALIAS")
+def releaseKeyPassword = findProperty("AI_MEETING_UPLOAD_KEY_PASSWORD") ?: System.getenv("AI_MEETING_UPLOAD_KEY_PASSWORD")
+def hasReleaseSigning = releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
+def strippedPoiDir = layout.buildDirectory.dir("stripped-libs")
+
+android {
+    namespace = "com.example.aimeeting"
+    compileSdk = 37
+
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile = file(releaseStoreFile)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
+    defaultConfig {
+        applicationId = "com.khoalpa.aimeeting"
+        minSdk = 28
+        targetSdk = 37
+        versionCode = appVersionCode
+        versionName = appVersionName
+        ndk {
+            abiFilters += ["arm64-v8a"]
+        }
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+        }
+        release {
+            minifyEnabled true
+            shrinkResources = true
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.release
+            }
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+    }
+
+    packaging {
+        resources {
+            excludes += [
+                    "META-INF/DEPENDENCIES",
+                    "META-INF/LICENSE",
+                    "META-INF/LICENSE.txt",
+                    "META-INF/NOTICE",
+                    "META-INF/NOTICE.txt"
+            ]
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+configurations {
+    poiScratchpadRaw {
+        transitive = false
+    }
+}
+
+def poiScratchpadJar = configurations.poiScratchpadRaw.elements.map { elements ->
+    elements.iterator().next().asFile
+}
+
+tasks.register("prepareAndroidPoiScratchpad", Copy) {
+    def outputDir = strippedPoiDir.map { it.dir("poi-scratchpad-android") }
+    doFirst {
+        delete(outputDir)
+    }
+    from(poiScratchpadJar.map { jarFile ->
+        zipTree(jarFile)
+    }) {
+        include "META-INF/LICENSE"
+        include "META-INF/NOTICE"
+        include "META-INF/MANIFEST.MF"
+        include "org/apache/poi/hwpf/**"
+        exclude "META-INF/*.RSA"
+        exclude "META-INF/*.SF"
+        exclude "META-INF/*.DSA"
+    }
+    into outputDir
+}
+
+tasks.register("jarStrippedPoiScratchpad", Jar) {
+    dependsOn "prepareAndroidPoiScratchpad"
+    archiveFileName = "poi-scratchpad-5.5.1-android.jar"
+    destinationDirectory = strippedPoiDir
+    from strippedPoiDir.map { it.dir("poi-scratchpad-android") }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += ["-Xlint:deprecation"]
+}
+
+dependencies {
+    implementation "com.alphacephei:vosk-android:0.3.75"
+    implementation files("libs/llamatik-cpu-1.4.0.aar")
+    implementation "com.google.mlkit:language-id:17.0.6"
+    implementation "com.google.mlkit:translate:17.0.3"
+    implementation "com.google.mlkit:text-recognition:16.0.1"
+    implementation "com.google.mlkit:text-recognition-chinese:16.0.1"
+    implementation "com.google.mlkit:text-recognition-japanese:16.0.1"
+    implementation "com.google.mlkit:text-recognition-korean:16.0.1"
+    implementation "org.apache.commons:commons-compress:1.28.0"
+    implementation "org.apache.poi:poi:5.5.1"
+    poiScratchpadRaw "org.apache.poi:poi-scratchpad:5.5.1"
+    implementation files(tasks.named("jarStrippedPoiScratchpad"))
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "org.json:json:20240303"
+}

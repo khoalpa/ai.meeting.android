@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="meeting_bg">@color/shared_bg</color>
+    <color name="meeting_panel">@color/shared_panel</color>
+    <color name="meeting_panel_alt">@color/shared_surface</color>
+    <color name="meeting_text">@color/shared_text</color>
+    <color name="meeting_muted">@color/shared_muted</color>
+    <color name="meeting_primary">@color/shared_accent</color>
+    <color name="meeting_primary_dark">@color/shared_accent_hover</color>
+    <color name="meeting_accent">@color/shared_info</color>
+    <color name="meeting_gold">@color/shared_warning</color>
+    <color name="meeting_border">@color/shared_border</color>
+    <color name="meeting_border_strong">@color/shared_border_strong</color>
+    <color name="meeting_success_bg">@color/shared_success_soft</color>
+    <color name="meeting_warning_bg">@color/shared_warning_soft</color>
+    <color name="meeting_danger">@color/shared_danger</color>
+</resources>

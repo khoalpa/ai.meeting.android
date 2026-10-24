@@ -1,0 +1,18 @@
+.gradle/
+.idea/
+*.iml
+build/
+local.properties
+app/build/
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+release/
+
+# Local temporary workspace files
+.tmp/
+
+# Local rollback copies for AI Themes
+.theme-backups/
